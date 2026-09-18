@@ -1,42 +1,44 @@
 package sv.edu.utec.servicio;
 
-import sv.edu.utec.api.ApiClient;
-import sv.edu.utec.api.ProductoApi;
+import sv.edu.utec.api.ProveedorAPI;
 import sv.edu.utec.datos.ProductoDAO;
 import sv.edu.utec.modelo.Producto;
 
+import java.io.IOException;
 import java.sql.SQLException;
 import java.util.List;
 
 public class SincronizacionService {
 
-    private final ApiClient apiClient;
-    private final ProductoDAO productoDAO;
+    private final ProveedorAPI proveedorAPI;
+    private final ProductoDAO dao;
 
-    public SincronizacionService() {
-        this.apiClient = new ApiClient();
-        this.productoDAO = new ProductoDAO();
+    public SincronizacionService(ProveedorAPI proveedorAPI, ProductoDAO dao) {
+        this.proveedorAPI = proveedorAPI;
+        this.dao = dao;
     }
 
-    public int importarProductosDesdeApi(int limite) throws SQLException {
+    public int[] sincronizar(int limite)
+            throws IOException, InterruptedException, SQLException {
 
-        List<ProductoApi> productosApi =
-                apiClient.obtenerProductos(limite);
+        List<Producto> productos =
+                proveedorAPI.obtenerProductos(limite);
 
-        int importados = 0;
+        int insertados = 0;
+        int actualizados = 0;
 
-        productoDAO.crearTabla();
+        for (Producto producto : productos) {
 
-        for (ProductoApi productoApi : productosApi) {
-
-            Producto producto = productoApi.aProducto();
-
-            if (!productoDAO.existe(producto.getId())) {
-                productoDAO.insertar(producto);
-                importados++;
+            if (dao.existe(producto.getId())) {
+                if (dao.actualizar(producto)) {
+                    actualizados++;
+                }
+            } else {
+                dao.insertar(producto);
+                insertados++;
             }
         }
 
-        return importados;
+        return new int[]{insertados, actualizados};
     }
 }
